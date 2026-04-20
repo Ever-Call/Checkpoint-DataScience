@@ -9,8 +9,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from scipy import stats
-
 st.set_page_config(page_title="A Evolução dos Jogos", page_icon="🎮", layout="wide")
 
 # ─── CONSTANTES ───────────────────────────────────────────────────────────────
