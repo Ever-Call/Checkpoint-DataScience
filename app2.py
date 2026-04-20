@@ -335,9 +335,3 @@ with c3:
         f"Mediana na Steam: **US$ {st_pagos.median():.2f}**. "
         "O sucesso no digital depende mais de qualidade e alcance do que de preço."
     )
-
-st.markdown("---")
-st.caption(
-    "**EVER & ANDRÉ** · Análise de Dados 2025 · "
-    "VGChartz – Video_Games.csv | Steam – a_steam_data_2021_2025.csv"
-)
