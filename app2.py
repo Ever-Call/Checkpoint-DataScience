@@ -1,4 +1,7 @@
-# A EVOLUÇÃO DOS JOGOS — Dashboard | Ever & André
+# A EVOLUÇÃO DOS JOGOS — Dashboard
+# Integrantes:
+# Ever Callisaya Amaru - RM563971
+# André Mateus Yoshimori - RM563310
 # Fontes:
 #   Video_Games.csv         → VGChartz ~16k títulos (1980–2020), vendas físicas + notas
 #   a_steam_data_2021_2025  → Steam ~65k títulos (2021–2025), preço + recomendações
@@ -71,8 +74,8 @@ st.markdown("---")
 
 k1, k2, k3 = st.columns(3)
 k1.metric("🎮 Títulos físicos (2010–2020)", f"{len(vg):,}")
-k2.metric("💿 Vendas físicas totais", f"{vg['Global_Sales'].sum():.0f} M")
-k3.metric("🖥️ Títulos na Steam (2021–2025)", f"{len(st_df):,}")
+k2.metric("Vendas físicas totais", f"{vg['Global_Sales'].sum():.0f} M")
+k3.metric("Títulos na Steam (2021–2025)", f"{len(st_df):,}")
 st.markdown("---")
 
 # 1. Panorama Geral Fisico 2010–2020
