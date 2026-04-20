@@ -263,7 +263,6 @@ fig = px.histogram(st_pagos, nbins=800, range_x=[0, 60],
 fig.update_layout(height=320, showlegend=False)
 st.plotly_chart(fig, width='stretch')
 
-dp_skew = stats.skew(st_pagos)
 p1, p2, p3, p4, p5 = st.columns(5)
 p1.metric("Média", f"US$ {st_pagos.mean():.2f}")
 p2.metric("Mediana", f"US$ {st_pagos.median():.2f}")
