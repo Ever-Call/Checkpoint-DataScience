@@ -116,9 +116,6 @@ fig = px.imshow(heat_df, text_auto=".0f", color_continuous_scale="Purples",
                 aspect="auto")
 fig.update_layout(height=420, coloraxis_colorbar_title="Vendas (M)")
 st.plotly_chart(fig, use_container_width=True)
-st.info("PS3 e Xbox 360 dominaram 2010–2013, chegando a 172M e 145M respectivamente. "
-        "Em 2014, o PS4 já ultrapassa ambos com 102M. Em 2016, o PS4 é absoluto com 69M "
-        "enquanto o PS3 colapsa para 4M — a troca de geração aconteceu em 2 anos.")
 st.markdown("---")
 
 # ── 3. REGIÕES ────────────────────────────────────────────────────────────────
@@ -181,12 +178,6 @@ with cb:
     fig.update_traces(texttemplate="%{text:,.0f}", textposition="outside")
     fig.update_layout(coloraxis_showscale=False, height=420)
     st.plotly_chart(fig, use_container_width=True)
-st.info(
-    "No físico, **Ação e Shooter** (GTA, Call of Duty) dominavam em vendas. "
-    "No digital, **Ação e RPG** lideram em engajamento médio por jogo — "
-    "enquanto **Indie e Casual** dominam em quantidade mas têm engajamento menor. "
-    "O mercado se democratizou em acesso, mas qualidade ainda concentra atenção nos mesmos gêneros."
-)
 st.markdown("---")
 
 # ── 5. PREÇO ──────────────────────────────────────────────────────────────────
@@ -262,9 +253,6 @@ for col, grp, xcol, ycol, escala, titulo, fmt in [
     fig.update_layout(coloraxis_showscale=False, height=420)
     with col:
         st.plotly_chart(fig, use_container_width=True)
-st.info("EA e Nintendo lideram o físico em vendas totais. Na Steam, **EA, FromSoftware e Game Science** "
-        "lideram em recomendações — reflexo de Elden Ring e Black Myth: Wukong. "
-        "Métricas diferentes, mas o mesmo padrão: poucos players concentram o impacto.")
 
 # ── CORRELAÇÃO ────────────────────────────────────────────────────────────────
 st.markdown("---")
