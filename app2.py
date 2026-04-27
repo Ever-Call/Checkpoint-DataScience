@@ -1,6 +1,6 @@
 # A EVOLUÇÃO DOS JOGOS — Dashboard
 # Ever Callisaya Amaru - RM563971 | André Mateus Yoshimori - RM563310
-# VGChartz (físico 2010–2020): kaggle.com/datasets/thedevastator/video-game-sales-and-ratings
+# VGChartz (físico 2010–2016): kaggle.com/datasets/thedevastator/video-game-sales-and-ratings
 # Steam (digital 2021–2025):   kaggle.com/datasets/jypenpen54534/steam-games-dataset-2021-2025-65k
 
 import streamlit as st
@@ -27,12 +27,15 @@ def load_vg():
     df["Ano"] = df["Ano"].astype(int)
     df["Gênero"] = df["Genre"].map(GENRE_PT).fillna(df["Genre"])
     df["Plataforma"] = df["Platform"].map(PLAT_NOME).fillna(df["Platform"])
-    return df[(df["Ano"] >= 2010) & (df["Ano"] <= 2020)].reset_index(drop=True)
+    # 2017 tem só 4 registros e 2020 tem 1 — são ruído, não dados reais
+    return df[(df["Ano"] >= 2010) & (df["Ano"] <= 2016)].reset_index(drop=True)
 
 @st.cache_data
 def load_steam():
     df = pd.read_csv("a_steam_data_2021_2025.csv")
     df["Tipo"] = df["price"].eq(0).map({True: "Gratuito", False: "Pago"})
+    # # Remove preços acima de US$60 — são ferramentas de software, não jogos
+    # df = df[df["price"] <= 60].reset_index(drop=True)
     return df
 
 @st.cache_data
@@ -43,35 +46,36 @@ def steam_generos_expandidos(_df):
     exp["genres"] = exp["genres"].str.strip()
     return exp[~exp["genres"].isin(STEAM_TAGS_EXCLUIR)]
 
-vg = load_vg()
-st_df = load_steam()
+vg     = load_vg()
+st_df  = load_steam()
 st_gen = steam_generos_expandidos(st_df)
 df_pagos = st_df[st_df["price"] > 0]
 
 # ── HEADER ────────────────────────────────────────────────────────────────────
 st.title("🎮 A Evolução dos Jogos: 2010 → 2025")
-st.markdown("**Ever & André** · VGChartz (físico, 2010–2020) + Steam (digital, 2021–2025)")
+st.markdown("**Ever & André** · VGChartz (físico, 2010–2016) + Steam (digital, 2021–2025)")
 st.markdown("---")
 k1, k2, k3 = st.columns(3)
-k1.metric("🎮 Títulos físicos (2010–2020)", f"{len(vg):,}")
+k1.metric("🎮 Títulos físicos (2010–2016)", f"{len(vg):,}")
 k2.metric("Vendas físicas totais", f"{vg['Global_Sales'].sum():.0f} M")
 k3.metric("Títulos na Steam (2021–2025)", f"{len(st_df):,}")
 st.markdown("---")
 
 # ── 1. MERCADO FÍSICO ─────────────────────────────────────────────────────────
-st.header("1. Como foi o mercado físico de 2010 a 2020?")
+st.header("1. Como foi o mercado físico de 2010 a 2016?")
 st.markdown(
     "O VGChartz registra vendas de mídia física de consoles. "
-    "A queda pós-2016 **não significa** que o mercado encolheu — "
-    "ela reflete a migração para o digital, que este dataset não captura."
+    "A queda pós-2013 **não significa** que o mercado encolheu — "
+    "ela reflete a troca de geração de consoles e a migração gradual para o digital."
 )
 
 vol = vg.groupby("Ano")["Global_Sales"].sum().reset_index(name="Vendas")
 fig = px.area(vol, x="Ano", y="Vendas", title="Vendas globais físicas por ano (milhões)",
               labels={"Vendas": "Milhões"}, color_discrete_sequence=["#00d4ff"])
-fig.add_vline(x=2013.5, line_dash="dash", line_color="orange")
+fig.add_vline(x=2013.5, line_dash="dash", line_color="orange",
+              annotation_text="PS4 / Xbox One chegam", annotation_font_color="orange")
 fig.update_layout(height=360)
-st.plotly_chart(fig, width='stretch')
+st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Distribuição de vendas — posição e dispersão")
 d = vg["Global_Sales"]
@@ -85,43 +89,49 @@ fig = px.box(vg, x="Ano", y="Global_Sales", points=False,
              color_discrete_sequence=["#7b2fff"],
              title="Distribuição de vendas por ano — Box Plot",
              labels={"Global_Sales": "Vendas (M)"})
-fig.update_layout(height=600)
-st.plotly_chart(fig, width='stretch')
+fig.update_layout(height=420, yaxis=dict(range=[0, 5]))
+st.plotly_chart(fig, use_container_width=True)
+st.caption("⚠️ Eixo Y limitado a 5M para legibilidade. Outliers como GTA V (21M) e Kinect Adventures (21M) existem mas distorceriam a visualização.")
 st.info(f"Média ({d.mean():.2f} M) muito acima da mediana ({d.median():.2f} M): "
-        "Poucos blockbusters concentram a maior parte das vendas.")
+        "a distribuição é fortemente assimétrica — poucos blockbusters concentram a maior parte das vendas.")
 st.markdown("---")
 
-# ── 2. PLATAFORMAS ────────────────────────────────────────────────────────────
+# ── 2. PLATAFORMAS — HEATMAP ──────────────────────────────────────────────────
 st.header("2. O perfil de plataforma mudou?")
-st.markdown("Comparamos as plataformas líderes em dois períodos da década.")
-ca, cb = st.columns(2)
-for col, filtro, titulo, escala in [
-    (ca, vg["Ano"] <= 2015, "Top plataformas — 2010 a 2015", "Purples"),
-    (cb, vg["Ano"] >= 2016, "Top plataformas — 2016 a 2020", "Blues"),
-]:
-    plat = vg[filtro].groupby("Plataforma")["Global_Sales"].sum().nlargest(8).sort_values().reset_index()
-    fig = px.bar(plat, x="Global_Sales", y="Plataforma", orientation="h",
-                 color="Global_Sales", color_continuous_scale=escala, title=titulo,
-                 text="Global_Sales", labels={"Global_Sales": "Vendas (M)", "Plataforma": ""})
-    fig.update_traces(texttemplate="%{text:.0f} M", textposition="outside")
-    fig.update_layout(coloraxis_showscale=False, height=360)
-    with col:
-        st.plotly_chart(fig, width='stretch')
-st.info("PS3 e Xbox 360 dominaram 2010–2013. PS4 assumiu a liderança em 2014 e manteve até 2020. "
-        "A queda de títulos físicos pós-2017 acompanha a ascensão do digital.")
+st.markdown(
+    "O heatmap abaixo mostra as vendas (M) por plataforma em cada ano. "
+    "A transição de geração — de PS3/Xbox 360 para PS4/Xbox One — fica visível nos dados."
+)
+
+top_plat = (vg.groupby("Plataforma")["Global_Sales"].sum().nlargest(10).index)
+heat_df = (vg[vg["Plataforma"].isin(top_plat)]
+           .groupby(["Plataforma", "Ano"])["Global_Sales"].sum()
+           .unstack(fill_value=0))
+# Ordenar plataformas pelo pico de vendas
+heat_df = heat_df.loc[heat_df.max(axis=1).sort_values(ascending=True).index]
+
+fig = px.imshow(heat_df, text_auto=".0f", color_continuous_scale="Purples",
+                title="Vendas físicas por plataforma e ano (M)",
+                labels={"x": "Ano", "y": "Plataforma", "color": "Vendas (M)"},
+                aspect="auto")
+fig.update_layout(height=420, coloraxis_colorbar_title="Vendas (M)")
+st.plotly_chart(fig, use_container_width=True)
+st.info("PS3 e Xbox 360 dominaram 2010–2013, chegando a 172M e 145M respectivamente. "
+        "Em 2014, o PS4 já ultrapassa ambos com 102M. Em 2016, o PS4 é absoluto com 69M "
+        "enquanto o PS3 colapsa para 4M — a troca de geração aconteceu em 2 anos.")
 st.markdown("---")
 
 # ── 3. REGIÕES ────────────────────────────────────────────────────────────────
-st.header("3. O mercado por região — vendas físicas (2010–2020)")
+st.header("3. O mercado por região — vendas físicas (2010–2016)")
 ca, cb = st.columns(2)
 with ca:
     reg_tot = vg[list(REGIOES_NOME)].sum()
     fig = px.pie(values=reg_tot.values, names=list(REGIOES_NOME.values()),
-                 hole=0.45, title="Participação por região (2010–2020)",
+                 hole=0.45, title="Participação por região (2010–2016)",
                  color_discrete_sequence=["#7b2fff", "#00d4ff", "#ff6b35", "#10b981"])
     fig.update_traces(textfont_color="white")
     fig.update_layout(height=360)
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 with cb:
     reg_melt = (vg.groupby("Ano")[list(REGIOES_NOME)].sum()
                 .reset_index().melt(id_vars="Ano", var_name="Regiao", value_name="Vendas"))
@@ -134,42 +144,55 @@ with cb:
 reg_pct = {k: vg[k].sum() / vg["Global_Sales"].sum() * 100 for k in REGIOES_NOME}
 st.info(f"**América do Norte ({reg_pct['NA_Sales']:.1f}%)** e **Europa ({reg_pct['EU_Sales']:.1f}%)** "
         f"concentram ~{reg_pct['NA_Sales'] + reg_pct['EU_Sales']:.0f}% das vendas físicas. "
-        f"O Japão ({reg_pct['JP_Sales']:.1f}%) tem mercado forte, mas focado em portáteis e RPGs.")
+        f"O Japão ({reg_pct['JP_Sales']:.1f}%) tem mercado forte, mas focado em portáteis e RPGs — "
+        "comportamento muito diferente do ocidente.")
 st.markdown("---")
 
 # ── 4. GÊNEROS ────────────────────────────────────────────────────────────────
 st.header("4. O perfil dos jogos mudou? Como?")
-st.markdown("Comparamos os gêneros dominantes nas **vendas físicas (2010–2020)** "
-            "com os gêneros mais presentes na **Steam (2021–2025)**.")
+st.markdown(
+    "Dois ângulos diferentes: **quantidade** (quantos títulos existem por gênero) "
+    "e **engajamento** (recomendações médias dos jogadores na Steam)."
+)
 ca, cb = st.columns(2)
 with ca:
     gen_vg = vg.groupby("Gênero")["Global_Sales"].sum().sort_values().reset_index()
     fig = px.bar(gen_vg, x="Global_Sales", y="Gênero", orientation="h",
                  color="Global_Sales", color_continuous_scale="Purples",
-                 title="Gêneros por vendas físicas — 2010–2020",
+                 title="Gêneros por vendas físicas — 2010–2016",
                  labels={"Global_Sales": "Vendas (M)", "Gênero": ""}, text="Global_Sales")
     fig.update_traces(texttemplate="%{text:.0f} M", textposition="outside")
     fig.update_layout(coloraxis_showscale=False, height=420)
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 with cb:
-    gen_st = (st_gen["genres"].value_counts().nlargest(12).sort_values()
-              .rename_axis("Gênero").reset_index(name="Qtd"))
-    fig = px.bar(gen_st, x="Qtd", y="Gênero", orientation="h",
-                 color="Qtd", color_continuous_scale="Blues",
-                 title="Gêneros por nº de títulos — Steam 2021–2025",
-                 labels={"Qtd": "Nº de títulos", "Gênero": ""}, text="Qtd")
-    fig.update_traces(texttemplate="%{text:,}", textposition="outside")
+    # Recomendações médias por gênero (só jogos com engajamento real)
+    gen_eng = (st_gen[st_gen["recommendations"] > 0]
+               .groupby("genres")["recommendations"]
+               .agg(["mean", "count"])
+               .query("count >= 30")
+               .reset_index()
+               .rename(columns={"genres": "Gênero", "mean": "Rec. Médias"}))
+    gen_eng = gen_eng.sort_values("Rec. Médias").tail(10)
+    fig = px.bar(gen_eng, x="Rec. Médias", y="Gênero", orientation="h",
+                 color="Rec. Médias", color_continuous_scale="Blues",
+                 title="Engajamento médio por gênero — Steam 2021–2025",
+                 labels={"Rec. Médias": "Recomendações médias", "Gênero": ""},
+                 text="Rec. Médias")
+    fig.update_traces(texttemplate="%{text:,.0f}", textposition="outside")
     fig.update_layout(coloraxis_showscale=False, height=420)
-    st.plotly_chart(fig, width='stretch')
-st.info("No físico, **Ação e Shooter** (GTA, Call of Duty, Battlefield) dominavam em vendas. "
-        "No digital pós-2020, **Indie e Casual** lideram em quantidade — o mercado se democratizou: "
-        "qualquer desenvolvedor pode publicar na Steam, e isso mudou completamente o perfil dos jogos.")
+    st.plotly_chart(fig, use_container_width=True)
+st.info(
+    "No físico, **Ação e Shooter** (GTA, Call of Duty) dominavam em vendas. "
+    "No digital, **Ação e RPG** lideram em engajamento médio por jogo — "
+    "enquanto **Indie e Casual** dominam em quantidade mas têm engajamento menor. "
+    "O mercado se democratizou em acesso, mas qualidade ainda concentra atenção nos mesmos gêneros."
+)
 st.markdown("---")
 
 # ── 5. PREÇO ──────────────────────────────────────────────────────────────────
 st.header("5. Como é o preço no mercado digital (2021–2025)?")
-st.markdown("Com 65 mil títulos lançados na Steam em 4 anos, o mercado digital tem "
-            "uma distribuição de preços muito diferente do físico.")
+st.markdown("Com dezenas de milhares de títulos lançados na Steam, "
+            "a distribuição de preços revela uma estratégia clara do mercado.")
 
 st_pagos = df_pagos["price"]
 preco_melt = (df_pagos.groupby("release_year")["price"].agg(["mean", "median"])
@@ -184,7 +207,7 @@ with ca:
                   labels={"release_year": "Ano"})
     fig.update_traces(line=dict(width=3))
     fig.update_layout(height=400)
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 with cb:
     tipo_ano = st_df.groupby(["release_year", "Tipo"]).size().reset_index(name="Qtd")
     fig = px.bar(tipo_ano, x="release_year", y="Qtd", color="Tipo",
@@ -193,22 +216,32 @@ with cb:
                  labels={"release_year": "Ano", "Qtd": "Nº de jogos", "Tipo": ""},
                  barmode="stack", text_auto=True)
     fig.update_layout(height=400)
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 
-fig = px.histogram(st_pagos, nbins=800, range_x=[0, 60],
-                   title="Distribuição de preços — Steam, jogos pagos",
+# Histograma e linhas de referência
+fig = px.histogram(df_pagos["price"],
+                   nbins=800, range_x=[0, 60],
+                   title="Distribuição de preços — Steam, jogos pagos até US$ 30 (98% dos títulos)",
                    labels={"value": "Preço (US$)", "count": "Nº de jogos"},
                    color_discrete_sequence=["#7b2fff"])
-fig.update_layout(height=320, showlegend=False)
-st.plotly_chart(fig, width='stretch')
+fig.add_vline(x=st_pagos.median(), line_dash="dash", line_color="#00d4ff",
+              annotation_text=f"Mediana US$ {st_pagos.median():.2f}",
+              annotation_font_color="#00d4ff", annotation_position="top right")
+fig.add_vline(x=st_pagos.mean(), line_dash="dot", line_color="#ff6b35",
+              annotation_text=f"Média US$ {st_pagos.mean():.2f}",
+              annotation_font_color="#ff6b35", annotation_position="top left")
+fig.update_layout(height=340, showlegend=False, yaxis_title="Nº de jogos (escala log)")
+st.plotly_chart(fig, use_container_width=True)
 
-p1, p2, p3, p4 = st.columns(4)
+p1, p2, p3 = st.columns(3)
 p1.metric("Média", f"US$ {st_pagos.mean():.2f}")
 p2.metric("Mediana", f"US$ {st_pagos.median():.2f}")
 p3.metric("Desvio padrão", f"US$ {st_pagos.std():.2f}")
-p4.metric("Q1 / Q3", f"{st_pagos.quantile(0.25):.2f} / {st_pagos.quantile(0.75):.2f}")
-st.info(f"A mediana de US$ {st_pagos.median():.2f} mostra que a maioria dos jogos pagos é barata. "
-        "O volume de lançamentos cresce todo ano — o mercado digital não para.")
+st.info(
+    f"A mediana de US$ {st_pagos.median():.2f} mostra que a estratégia dominante é preço baixo. "
+    f"A média de US$ {st_pagos.mean():.2f} é bem maior — puxada por títulos premium que são minoria. "
+    "O desvio padrão alto confirma: há muita dispersão, mas o mercado converge para a faixa US$ 1–10."
+)
 st.markdown("---")
 
 # ── 6. PUBLISHERS ─────────────────────────────────────────────────────────────
@@ -216,9 +249,11 @@ st.header("6. Quem domina o mercado?")
 ca, cb = st.columns(2)
 for col, grp, xcol, ycol, escala, titulo, fmt in [
     (ca, vg.groupby("Publisher")["Global_Sales"].sum().nlargest(10).sort_values().reset_index(),
-     "Global_Sales", "Publisher", "Purples", "Top 10 publishers — vendas físicas (M) 2010–2020", "%{text:.0f} M"),
+     "Global_Sales", "Publisher", "Purples",
+     "Top 10 publishers — vendas físicas (M) 2010–2016", "%{text:.0f} M"),
     (cb, st_df.groupby("publisher")["recommendations"].sum().nlargest(10).sort_values().reset_index(),
-     "recommendations", "publisher", "Blues", "Top 10 publishers — recomendações Steam 2021–2025", "%{text:,.0f}"),
+     "recommendations", "publisher", "Blues",
+     "Top 10 publishers — recomendações Steam 2021–2025", "%{text:,.0f}"),
 ]:
     fig = px.bar(grp, x=xcol, y=ycol, orientation="h", color=xcol,
                  color_continuous_scale=escala, title=titulo, text=xcol,
@@ -226,14 +261,15 @@ for col, grp, xcol, ycol, escala, titulo, fmt in [
     fig.update_traces(texttemplate=fmt, textposition="outside")
     fig.update_layout(coloraxis_showscale=False, height=420)
     with col:
-        st.plotly_chart(fig, width='stretch')
-st.info("EA e Nintendo lideram o físico em vendas. Na Steam, **EA, FromSoftware e Game Science** "
+        st.plotly_chart(fig, use_container_width=True)
+st.info("EA e Nintendo lideram o físico em vendas totais. Na Steam, **EA, FromSoftware e Game Science** "
         "lideram em recomendações — reflexo de Elden Ring e Black Myth: Wukong. "
-        "Atenção: vendas em M e recomendações são métricas diferentes e não comparáveis diretamente.")
+        "Métricas diferentes, mas o mesmo padrão: poucos players concentram o impacto.")
 
 # ── CORRELAÇÃO ────────────────────────────────────────────────────────────────
 st.markdown("---")
 st.subheader("Correlação entre variáveis — Steam")
+st.markdown("A matriz de correlação de Pearson revela as relações lineares entre as variáveis numéricas do dataset.")
 corr_matrix = st_df[["price", "recommendations", "release_year"]].dropna().corr()
 corr_matrix.index = corr_matrix.columns = ["Preço", "Recomendações", "Ano"]
 fig = px.imshow(corr_matrix, text_auto=".2f", color_continuous_scale="RdBu_r",
@@ -241,9 +277,12 @@ fig = px.imshow(corr_matrix, text_auto=".2f", color_continuous_scale="RdBu_r",
                 title="Matriz de correlação de Pearson — Steam (2021–2025)")
 fig.update_layout(height=380)
 st.plotly_chart(fig, use_container_width=True)
-st.info("Preço e recomendações têm correlação próxima de zero (r ≈ 0.06): "
-        "pagar mais caro não garante mais engajamento. "
-        "O sucesso no digital depende de qualidade e alcance, não de preço.")
+st.info(
+    "**Preço × Recomendações: r = 0.06** — correlação quase nula. "
+    "Pagar mais caro não garante mais engajamento dos jogadores. "
+    "**Ano × Recomendações: r ≈ 0** — o crescimento em lançamentos não aumentou o engajamento médio. "
+    "Conclusão: volume e preço não determinam sucesso — qualidade e alcance sim."
+)
 
 # ── CONCLUSÕES ────────────────────────────────────────────────────────────────
 st.markdown("---")
@@ -251,15 +290,18 @@ st.header("Conclusões")
 c1, c2, c3 = st.columns(3)
 with c1:
     st.subheader("Plataformas")
-    st.markdown("PS3 e Xbox 360 dominaram 2010–2013. PS4 assumiu em 2014. "
-                "Pós-2020, o digital explode em volume: "
-                "**65 mil títulos em 4 anos vs. 5 mil no físico em 10 anos**.")
+    st.markdown("PS3 e Xbox 360 dominaram 2010–2013. Em 2014, o PS4 assumiu e nunca soltou. "
+                "A transição foi rápida: **2 anos para uma geração completa ser substituída**. "
+                "Pós-2020, o digital explodiu: **65 mil títulos em 4 anos**.")
 with c2:
     st.subheader("Gêneros")
     st.markdown("No físico: **Ação e Shooter** lideravam em vendas. "
-                "No digital: **Indie e Casual** dominam em quantidade. "
-                "O mercado se democratizou — mais jogos, mais gêneros, mais acesso.")
+                "No digital: a quantidade é dominada por **Indie e Casual**, "
+                "mas o engajamento real ainda está em **Ação e RPG**. "
+                "O acesso democratizou, o gosto não mudou tanto.")
 with c3:
-    st.subheader("Preço e engajamento")
+    st.subheader("Preço e correlação")
     st.markdown(f"Mediana na Steam: **US$ {st_pagos.median():.2f}**. "
-                "O sucesso no digital depende mais de qualidade e alcance do que de preço.")
+                "Correlação preço × engajamento: **r = 0.06**. "
+                "O mercado digital diz claramente: "
+                "**preço baixo atrai, qualidade retém**.")
